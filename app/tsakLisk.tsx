@@ -1,50 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 
 interface Task {
-  id: number;
+  _id: string;
   text: string;
   completed: boolean;
 }
 
+export default function TaskList() {
+  const [taskList, setTaskList] = useState<Task[]>([]);
+  const [newTask, setNewTask] = useState<string>("");
 
-interface TaskListProps {
-  tasks: Task[];
-}
-
-export default function TaskList({ tasks }: TaskListProps) {
-
-  const [taskList, setTaskList] = useState<Task[]>(tasks || []);
-
-  const handleChange = (id: number) => {
-    const updatedTasks = taskList.map((task) => {
-      if (task.id === id) {
-        return { ...task, completed: !task.completed };
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const res = await axios.get('/api/tasks');
+        setTaskList(res.data);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
       }
-      return task;
-    });
-    setTaskList(updatedTasks);
-    console.log(updatedTasks);
+    };
+    
+    fetchTasks();
+  }, []);
+
+  const addTask = async () => {
+    try {
+      const res = await axios.post('/api/tasks', { text: newTask });
+      setTaskList([...taskList, res.data]);
+      setNewTask("");
+    } catch (error) {
+      console.error('Error adding task:', error);
+    }
+  };
+
+  const toggleTask = async (id: string) => {
+    const taskToToggle = taskList.find(task => task._id === id);
+    if (taskToToggle) {
+      try {
+        const res = await axios.put('/api/tasks', { ...taskToToggle, completed: !taskToToggle.completed });
+        setTaskList(taskList.map(task => task._id === id ? res.data : task));
+      } catch (error) {
+        console.error('Error toggling task:', error);
+      }
+    }
+  };
+
+  const removeTask = async (id: string) => {
+    try {
+      await axios.delete('/api/tasks', { data: { _id: id } });
+      setTaskList(taskList.filter(task => task._id !== id));
+    } catch (error) {
+      console.error('Error removing task:', error);
+    }
   };
 
   return (
-    <ul>
-      {taskList.map((task) => (
-        <li key={task.id}>
-          <input
-            type="checkbox"
-            checked={task.completed || false}
-            onChange={() => handleChange(task.id)}
-            style={{ marginRight: "10px", 
-            width: "30px", 
-            height: "30px", 
-            accentColor: "black", 
-         }}
-          />
-          {task?.text || "Task"}
-        </li>
-      ))}
-    </ul>
+    <div>
+      <input 
+        type="text" 
+        value={newTask} 
+        onChange={(e) => setNewTask(e.target.value)} 
+        placeholder="New Task" 
+      />
+      <button onClick={addTask} style={{marginLeft: "10px"}}>Add Task</button>
+      <ul>
+        {taskList.map((task) => (
+          <li key={task._id}>
+            <input
+              type="checkbox"
+              checked={task.completed || false}
+              onChange={() => toggleTask(task._id)}
+              style={{ marginRight: "10px", width: "15px", height: "15px", accentColor: "black" }}
+            />
+            {task.text}
+            <button onClick={() => removeTask(task._id)} style={{ marginLeft: "10px" }}>Remove</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
